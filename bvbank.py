@@ -13,9 +13,21 @@ from Cryptodome.Cipher import PKCS1_v1_5
 from base64 import b64encode
 from pyppeteer import launch
 import asyncio
-
+from itertools import cycle
+import random
 class BVBank:
-    def __init__(self,username, password, account_number):
+    def __init__(self,username, password, account_number,proxy_list=None):
+        self.proxy_list = proxy_list
+        self.proxy_cycle = cycle(self.proxy_list) if self.proxy_list else None
+        if self.proxy_list:
+            self.proxy_info = random.choice(self.proxy_list)
+            proxy_host, proxy_port, username_proxy, password_proxy = self.proxy_info.split(':')
+            self.proxies = {
+                'http': f'http://{username_proxy}:{password_proxy}@{proxy_host}:{proxy_port}',
+                'https': f'http://{username_proxy}:{password_proxy}@{proxy_host}:{proxy_port}'
+            }
+        else:
+            self.proxies = None
         self.keyanticaptcha = "b8246038ce1540888c4314a6c043dcae"
         self.base64_key = "MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDOMAicHDxAkPEBRp4RfMpDCbTQ16wZCFdS4Uw2E9S5NVIGIRdirdViOTsaNWmbk/pQQQeVIccsHHh9hvH6St6z0krxmIPeXs9NqYniVNcWOqxPDxcm4FuKc736RI6TVqXI4zA/yH/+2dA4uCF54ekOoPT3Akd1m13m0hNZHX/77wIDAQAB"
         self.public_key_pem = f"-----BEGIN PUBLIC KEY-----\n{self.base64_key}\n-----END PUBLIC KEY-----"
@@ -89,12 +101,13 @@ class BVBank:
 
         # Navigate to the URL
         await page.goto('https://digibank.bvbank.net.vn/login?type=dn')
+        
 
         # Wait for a specific element to appear (can replace 'body' with a more specific selector)
         await page.waitForSelector('body > div > main > div > section > div.content-wrap.sme-register-form > div > div > div:nth-child(1) > h2')
         # Optionally, you can also wait for the network to be idle
         # await page.waitForNavigation({'waitUntil': 'networkidle0'})  # Wait for the network to idle (no active connections)
-
+        time.sleep(1)
         # Retrieve cookies
         cookies = await page.cookies()
 
@@ -185,6 +198,19 @@ class BVBank:
             transactions.append(transaction)
 
         return transactions
+    def change_proxy(self):
+            print('change_proxy')
+            if not self.proxy_cycle:
+                print("No proxies available. Setting self.proxies to None.")
+                self.proxies = None
+                return
+            self.proxy_info = next(self.proxy_cycle)  # Lấy proxy kế tiếp từ vòng lặp
+            proxy_host, proxy_port, username_proxy, password_proxy = self.proxy_info.split(':')
+            self.proxies = {
+                'http': f'http://{username_proxy}:{password_proxy}@{proxy_host}:{proxy_port}',
+                'https': f'http://{username_proxy}:{password_proxy}@{proxy_host}:{proxy_port}'
+            }
+            print(f"New proxy: {self.proxies}")
     def base_request_get(self,url):
         headers = {
         'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
@@ -201,8 +227,12 @@ class BVBank:
         'upgrade-insecure-requests': '1',
         'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0',
         }
-        
-        response = self.session.get(url, headers=headers)
+        try:
+            response = self.session.get(url, headers=headers,proxies=self.proxies)
+        except Exception as e:
+            print('reason change proxy',e)
+            self.change_proxy()
+            return None
         return response
     async def login(self,relogin=False):
         if not relogin:
@@ -251,8 +281,12 @@ class BVBank:
         'upgrade-insecure-requests': '1',
         'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0'
         }
-
-        response = self.session.post(url, headers=headers, data=encoded_payload,allow_redirects=True)
+        try:
+            response = self.session.post(url, headers=headers, data=encoded_payload,allow_redirects=True,proxies=self.proxies)
+        except Exception as e:
+            print('reason change proxy',e)
+            self.change_proxy()
+            return None
         # with open("login.html", "w", encoding="utf-8") as file:
         #     file.write(response.text)
         if 'https://digibank.bvbank.net.vn/home' in response.url:
@@ -264,20 +298,24 @@ class BVBank:
         else:
             error_message = self.extract_error_message(response.text)
             print(error_message)
-            if 'vô hiệu hóa' in error_message:
-                return  {
-                        "success": False,
-                        "code": 449,
-                        "message": "Blocked account!",
-                        "details": error_message
-                    }
-            elif 'nhập sai tên đăng nhập hoặc mật khẩu' in error_message:
-                return {
-                        'success': False,
-                        'message': 'Đăng nhập không thành công!',
-                        'code': 444,
-                        "details": error_message
-                    }
+            if error_message:
+                if 'vô hiệu hóa' in error_message:
+                    return  {
+                            "success": False,
+                            "code": 449,
+                            "message": "Blocked account!",
+                            "details": error_message
+                        }
+                elif 'nhập sai tên đăng nhập hoặc mật khẩu' in error_message:
+                    return {
+                            'success': False,
+                            'message': 'Đăng nhập không thành công!',
+                            'code': 444,
+                            "details": error_message
+                        }
+            else:
+                return await self.login(relogin=True)
+
                 
         return None
 
