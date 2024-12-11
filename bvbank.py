@@ -204,11 +204,11 @@ class BVBank:
         
         response = self.session.get(url, headers=headers)
         return response
-    async def login(self):
-        
-        balance_response = await self.get_balance(self.account_number)
-        if balance_response['code'] != 520:
-            return balance_response
+    async def login(self,relogin=False):
+        if relogin:
+            balance_response = await self.get_balance(self.account_number)
+            if balance_response['code'] != 520:
+                return balance_response
             
         self.session = requests.Session()
         await self.get_cookies()
@@ -285,7 +285,7 @@ class BVBank:
         if not self.is_login or time.time() - self.time_login > 9000:
             self.is_login = True
             self.save_data()
-            login = await self.login()
+            login = await self.login(relogin=True)
             return login
         response = self.base_request_get('https://digibank.bvbank.net.vn/home')
         # with open("home.html", "w", encoding="utf-8") as file:
