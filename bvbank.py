@@ -95,27 +95,32 @@ class BVBank:
             print(f"Encryption error: {ex}")
             return False
     async def get_cookies(self):
-        http_proxy = self.proxies.get('http')
-        https_proxy = self.proxies.get('https')
+        if self.proxies:
+            http_proxy = self.proxies.get('http')
+            https_proxy = self.proxies.get('https')
 
-        # Extract proxy details (host, port, username, password)
-        # Assuming the format is: http://username:password@host:port
-        proxy_url = http_proxy or https_proxy  # Use either HTTP or HTTPS proxy
-        proxy_parts = proxy_url.replace('http://', '').split('@')
-        credentials, proxy_address = proxy_parts[0], proxy_parts[1]
-        proxy_username, proxy_password = credentials.split(':')
-        host, port = proxy_address.split(':')
+            # Extract proxy details (host, port, username, password)
+            # Assuming the format is: http://username:password@host:port
+            proxy_url = http_proxy or https_proxy  # Use either HTTP or HTTPS proxy
+            proxy_parts = proxy_url.replace('http://', '').split('@')
+            credentials, proxy_address = proxy_parts[0], proxy_parts[1]
+            proxy_username, proxy_password = credentials.split(':')
+            host, port = proxy_address.split(':')
         # Launch the browser
-        browser = await launch(headless=True,args=[
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            f'--proxy-server=http://{host}:{port}'  # Set proxy
-        ])
+        if self.proxies:
+            browser = await launch(headless=True,args=[
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                f'--proxy-server=http://{host}:{port}'  # Set proxy
+            ])
+        else:
+            browser = await launch(headless=True)
         page = await browser.newPage()
-        await page.authenticate({
-                'username': proxy_username,
-                'password': proxy_password
-            })
+        if self.proxies:
+            await page.authenticate({
+                    'username': proxy_username,
+                    'password': proxy_password
+                })
         # Navigate to the URL
         await page.goto('https://digibank.bvbank.net.vn/login?type=dn')
         
