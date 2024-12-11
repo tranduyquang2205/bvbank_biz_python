@@ -95,6 +95,7 @@ class BVBank:
             print(f"Encryption error: {ex}")
             return False
     async def get_cookies(self):
+        cookie_dict = {}
         # Launch the browser
         if self.proxies:
             http_proxy = self.proxies.get('http')
