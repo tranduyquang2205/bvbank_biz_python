@@ -205,7 +205,7 @@ class BVBank:
         response = self.session.get(url, headers=headers)
         return response
     async def login(self,relogin=False):
-        if relogin:
+        if not relogin:
             balance_response = await self.get_balance(self.account_number)
             if balance_response['code'] != 520:
                 return balance_response
