@@ -95,6 +95,7 @@ class BVBank:
             print(f"Encryption error: {ex}")
             return False
     async def get_cookies(self):
+        # Launch the browser
         if self.proxies:
             http_proxy = self.proxies.get('http')
             https_proxy = self.proxies.get('https')
@@ -106,9 +107,9 @@ class BVBank:
             credentials, proxy_address = proxy_parts[0], proxy_parts[1]
             proxy_username, proxy_password = credentials.split(':')
             host, port = proxy_address.split(':')
-        # Launch the browser
         if self.proxies:
-            browser = await launch(headless=True,args=[
+            browser = await launch(headless=True,        
+                                args=[
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
                 f'--proxy-server=http://{host}:{port}'  # Set proxy
@@ -121,32 +122,31 @@ class BVBank:
                     'username': proxy_username,
                     'password': proxy_password
                 })
-        # Navigate to the URL
-        await page.goto('https://digibank.bvbank.net.vn/login?type=dn')
-        
+        try:
+            await page.goto('https://digibank.bvbank.net.vn/login')
 
-        # Wait for a specific element to appear (can replace 'body' with a more specific selector)
-        await page.waitForSelector('body > div > main > div > section > div.content-wrap.sme-register-form > div > div > div:nth-child(1) > h2')
-        # Optionally, you can also wait for the network to be idle
-        # await page.waitForNavigation({'waitUntil': 'networkidle0'})  # Wait for the network to idle (no active connections)
-        time.sleep(1)
-        # Retrieve cookies
-        cookies = await page.cookies()
+            # Wait for a specific element to appear (can replace 'body' with a more specific selector)
+            await page.waitForSelector('body > div > main > div > section > div.content-wrap.sme-register-form > div > div > div:nth-child(1) > h2')
+            # Optionally, you can also wait for the network to be idle
+            # await page.waitForNavigation({'waitUntil': 'networkidle0'})  # Wait for the network to idle (no active connections)
 
-        # Create a dictionary of cookie names and values
-        cookie_dict = {cookie['name']: cookie['value'] for cookie in cookies}
+            # Retrieve cookies
+            cookies = await page.cookies()
 
-        # Print the cookies for debugging
-        # print(cookies)  # This will print a list of cookies with all their details
+            # Create a dictionary of cookie names and values
+            cookie_dict = {cookie['name']: cookie['value'] for cookie in cookies}
 
-        # Update the session cookies with the cookie_dict (name: value format)
-        self.session.cookies.update(cookie_dict)
+            # Print the cookies for debugging
+            # print(cookies)  # This will print a list of cookies with all their details
 
+            # Update the session cookies with the cookie_dict (name: value format)
+            self.session.cookies.update(cookie_dict)
+            return cookie_dict
+
+        finally:
         # Close the browser
-        await browser.close()
-
-        # Return the cookie dictionary
-        return cookie_dict
+            await browser.close()
+            return cookie_dict  
 
     def extract_text_from_td(self,td_string):
         return re.sub(r"<[^>]*>", "", td_string).strip()
