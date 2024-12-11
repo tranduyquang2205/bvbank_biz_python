@@ -341,7 +341,7 @@ class BVBank:
         else:
             self.is_login = False
             self.save_data()
-            return {'code':520 ,'success': False, 'message': 'Unknown Error!'} 
+            return {'code':500 ,'success': False, 'message': 'Unknown Error!','data':response.text} 
 
 
     async def get_transactions(self,account_number,fromDate,toDate,latest=False):
