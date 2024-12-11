@@ -58,8 +58,8 @@ class Transactions(BaseModel):
 @app.post('/get_transactions', tags=["get_transactions"])
 async def get_transactions_api(input: Transactions):
     try:
-        bvbank = BVBank(input.username, input.password, input.account_number)
-        history = await bvbank.get_transactions(input.account_number,input.from_date,input.to_date,input.latest,input.proxy_list)
+        bvbank = BVBank(input.username, input.password, input.account_number,input.proxy_list)
+        history = await bvbank.get_transactions(input.account_number,input.from_date,input.to_date,input.latest)
         return APIResponse.json_format(history)
     except Exception as e:
         response = str(e)
