@@ -363,7 +363,7 @@ class BVBank:
         except:
             self.is_login = False
             self.save_data()
-            return {'code':520 ,'success': False, 'message': 'Unknown Error!'} 
+            return {'code':500 ,'success': False, 'message': 'Unknown Error!','data':response.text} 
         # transactions =  self.extract_transaction_history(response.text)
         if  'response' in response:
             return {'code':200,'success': True, 'message': 'Thành công',
