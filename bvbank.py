@@ -11,7 +11,7 @@ import os
 from Cryptodome.PublicKey import RSA
 from Cryptodome.Cipher import PKCS1_v1_5
 from base64 import b64encode
-from pyppeteer import launch
+from playwright.async_api import async_playwright
 import asyncio
 from itertools import cycle
 import random
@@ -96,58 +96,52 @@ class BVBank:
             return False
     async def get_cookies(self):
         cookie_dict = {}
-        # Launch the browser
+
         if self.proxies:
             http_proxy = self.proxies.get('http')
             https_proxy = self.proxies.get('https')
+            proxy_url = http_proxy or https_proxy
 
-            # Extract proxy details (host, port, username, password)
-            # Assuming the format is: http://username:password@host:port
-            proxy_url = http_proxy or https_proxy  # Use either HTTP or HTTPS proxy
+            # Parse proxy
             proxy_parts = proxy_url.replace('http://', '').split('@')
             credentials, proxy_address = proxy_parts[0], proxy_parts[1]
             proxy_username, proxy_password = credentials.split(':')
             host, port = proxy_address.split(':')
-        if self.proxies:
-            browser = await launch(headless=True,        
-                                args=[
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                f'--proxy-server=http://{host}:{port}'  # Set proxy
-            ])
+
+            proxy_config = {
+                "server": f"http://{host}:{port}",
+                "username": proxy_username,
+                "password": proxy_password
+            }
         else:
-            browser = await launch(headless=True)
-        page = await browser.newPage()
-        if self.proxies:
-            await page.authenticate({
-                    'username': proxy_username,
-                    'password': proxy_password
-                })
-        try:
-            await page.goto('https://digibank.bvbank.net.vn/login')
+            proxy_config = None
 
-            # Wait for a specific element to appear (can replace 'body' with a more specific selector)
-            await page.waitForSelector('body > div > main > div > section > div.content-wrap.sme-register-form > div > div > div:nth-child(1) > h2')
-            # Optionally, you can also wait for the network to be idle
-            # await page.waitForNavigation({'waitUntil': 'networkidle0'})  # Wait for the network to idle (no active connections)
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(
+                headless=True,
+                proxy=proxy_config  # None nếu không có proxy
+            )
 
-            # Retrieve cookies
-            cookies = await page.cookies()
+            context = await browser.new_context()
+            page = await context.new_page()
 
-            # Create a dictionary of cookie names and values
-            cookie_dict = {cookie['name']: cookie['value'] for cookie in cookies}
+            try:
+                await page.goto('https://digibank.bvbank.net.vn/login')
 
-            # Print the cookies for debugging
-            # print(cookies)  # This will print a list of cookies with all their details
+                await page.wait_for_selector(
+                    'body > div > main > div > section > div.content-wrap.sme-register-form > div > div > div:nth-child(1) > h2'
+                )
 
-            # Update the session cookies with the cookie_dict (name: value format)
-            self.session.cookies.update(cookie_dict)
-            return cookie_dict
+                # Lấy cookie và chuyển sang dict
+                cookies = await context.cookies()
+                cookie_dict = {cookie['name']: cookie['value'] for cookie in cookies}
 
-        finally:
-        # Close the browser
-            await browser.close()
-            return cookie_dict  
+                # Cập nhật session
+                self.session.cookies.update(cookie_dict)
+                return cookie_dict
+
+            finally:
+                await browser.close()    
 
     def extract_text_from_td(self,td_string):
         return re.sub(r"<[^>]*>", "", td_string).strip()
