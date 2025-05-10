@@ -388,7 +388,10 @@ class BVBank:
 
             return {'code':500 ,'success': False, 'message': 'Unknown Error!','data':response.text} 
         # transactions =  self.extract_transaction_history(response.text)
+        
         if  'response' in response:
+            response['response'].reverse()
+            
             return {'code':200,'success': True, 'message': 'Thành công',
                     'data':{
                         'transactions':response['response'],
